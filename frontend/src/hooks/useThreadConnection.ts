@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Message, MessageType } from '../types'
-import { apiFetch } from '../lib/api'
+import { apiFetch, API_HOST } from '../lib/api'
 
-// WebSocket URL - use env var or default to AWS API Gateway
-const WS_URL = import.meta.env.VITE_WS_URL || 'wss://xc097ns0ve.execute-api.us-east-1.amazonaws.com/prod'
+// Share the deployment's API origin unless explicitly overridden.
+const WS_URL = import.meta.env.VITE_WS_URL || API_HOST.replace(/^http/, 'ws') + '/stream'
 
 // Artifact event from WebSocket stream
 export interface ArtifactEvent {

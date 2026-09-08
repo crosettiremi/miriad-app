@@ -10,7 +10,7 @@ export default defineConfig({
     hookTimeout: 60000, // 60s for setup/teardown hooks
     // Workaround for spurious "Worker exited unexpectedly" errors during cleanup
     // These occur after tests complete and don't affect test results
-    dangerouslyIgnoreUnhandledErrors: true,
+    dangerouslyIgnoreUnhandledErrors: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

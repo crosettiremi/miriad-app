@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/.dev.vars*
+**/.wrangler
+**/*.pem
+**/developer-token.txt
+frontend
+studio
+docs

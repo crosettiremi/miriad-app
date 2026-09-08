@@ -1,3 +1,4 @@
+import { instructions } from './content/instructions.js';
 /**
  * Sanity Instructions Client
  *
@@ -85,6 +86,7 @@ function isCacheValid(): boolean {
  * Refreshes cache in background if expired.
  */
 export async function getInstructions(): Promise<Map<string, Instruction>> {
+  if (process.env.CONTENT_SOURCE === 'bundled') return new Map(instructions.map(i => [i.slug,{id:i.slug,summary:i.summary,content:i.content}]));
   if (isCacheValid()) {
     return instructionCache;
   }

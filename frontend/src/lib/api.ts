@@ -9,7 +9,7 @@ import type { Message } from '../types'
 
 // API host - use env var or default to local dev server (port 3234 to avoid conflicts)
 // This is the single source of truth for backend URL - all HTTP and WebSocket calls should use this
-export const API_HOST = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3234'
+export const API_HOST = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3234')
 
 // =============================================================================
 // Auth Types

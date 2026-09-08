@@ -454,7 +454,7 @@ describe('MCP HTTP Routes (JSON-RPC)', () => {
       expect(json.id).toBe(1);
       expect(json.result.tools).toBeDefined();
       expect(Array.isArray(json.result.tools)).toBe(true);
-      expect(json.result.tools.length).toBe(23); // 10 artifact + 2 message + 1 instructions + 2 communication + 4 channel awareness + 4 knowledge base
+      expect(json.result.tools.length).toBe(24); // Includes structured_ask alongside the original tool set
 
       // Verify tool names
       const toolNames = json.result.tools.map((t: { name: string }) => t.name);

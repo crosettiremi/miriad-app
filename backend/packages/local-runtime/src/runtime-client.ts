@@ -7,6 +7,8 @@
  */
 
 import WebSocket from 'ws';
+import { join } from 'node:path';
+import { FrameOutbox } from './frame-outbox.js';
 import { AgentManager } from './agent-manager.js';
 import { getMachineInfo } from './config.js';
 import type {
@@ -46,6 +48,7 @@ export type RuntimeStatus = 'disconnected' | 'connecting' | 'connected' | 'ready
 
 export class RuntimeClient {
   private readonly runtimeConfig: RuntimeConfig;
+  private readonly frameOutbox?: FrameOutbox;
   private readonly agentManager: AgentManager;
 
   private ws: WebSocket | null = null;
@@ -72,6 +75,7 @@ export class RuntimeClient {
 
   constructor(config: RuntimeClientConfig) {
     this.runtimeConfig = config.config;
+    if (process.env.MIRIAD_RELIABLE_FRAMES === '1') this.frameOutbox = new FrameOutbox(join(config.config.workspace.basePath,'.miriad-frame-outbox'));
     this.onConnected = config.onConnected;
     this.onDisconnected = config.onDisconnected;
     this.onError = config.onError;
@@ -203,6 +207,11 @@ export class RuntimeClient {
       return;
     }
 
+    if ((message as {type:string}).type === 'frame_ack') {
+      const id = (message as unknown as {operationId?:unknown}).operationId;
+      if (typeof id === 'string') this.frameOutbox?.ack(id);
+      return;
+    }
     switch (message.type) {
       case 'runtime_connected':
         console.log(`[RuntimeClient] Runtime connected: ${message.runtimeId} (protocol ${message.protocolVersion})`);
@@ -213,6 +222,7 @@ export class RuntimeClient {
         this.reCheckinActiveAgents();
         // Start heartbeat interval for agent liveness
         this.startHeartbeatInterval();
+        this.resendFrames();
         // Start idle timeout check if configured
         this.startIdleCheck();
         break;
@@ -300,6 +310,9 @@ export class RuntimeClient {
   }
 
   private sendFrame(frameMessage: AgentFrameMessage): void {
+    if (this.frameOutbox && 'i' in frameMessage.frame && 'v' in frameMessage.frame) {
+      this.frameOutbox.put(`${this.runtimeConfig.credentials.runtimeId}:${frameMessage.frame.i}`,frameMessage);
+    }
     this.send(frameMessage);
   }
 
@@ -337,6 +350,10 @@ export class RuntimeClient {
   /**
    * Start periodic heartbeat for all online agents.
    */
+  private resendFrames(): void {
+    if (this.status !== 'ready' || this.ws?.readyState !== WebSocket.OPEN) return;
+    for (const record of this.frameOutbox?.pending() ?? []) this.ws.send(JSON.stringify(record.frame));
+  }
   private startHeartbeatInterval(): void {
     if (this.heartbeatInterval) {
       return; // Already running
@@ -345,6 +362,7 @@ export class RuntimeClient {
     console.log(`[RuntimeClient] Starting heartbeat interval (${RuntimeClient.HEARTBEAT_INTERVAL_MS / 1000}s)`);
     this.heartbeatInterval = setInterval(() => {
       this.sendHeartbeats();
+      this.resendFrames();
     }, RuntimeClient.HEARTBEAT_INTERVAL_MS);
   }
 
