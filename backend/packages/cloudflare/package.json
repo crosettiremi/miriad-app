@@ -13,7 +13,9 @@
     "migrate": "tsx scripts/migrate.ts",
     "seed:cloudflare": "tsx scripts/seed.ts",
     "test:security": "node scripts/security-smoke.mjs",
-    "test:postgres": "tsx scripts/postgres-smoke.ts"
+    "test:postgres": "tsx scripts/postgres-smoke.ts",
+    "migrate:homelab": "node scripts/migrate-homelab.mjs",
+    "check:schema": "node scripts/check-schema.mjs"
   },
   "dependencies": {
     "@cast/core": "workspace:*",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260908.1",
+    "esbuild": "0.27.2",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
     "vite": "8.0.0",

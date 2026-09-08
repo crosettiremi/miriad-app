@@ -38,14 +38,14 @@ jobs:
           MIRIAD_APP_ORIGIN: ${{ vars.MIRIAD_APP_ORIGIN }}
           MIRIAD_PREVIEW_DOMAIN: ${{ vars.MIRIAD_PREVIEW_DOMAIN }}
           MIRIAD_PREVIEW_ZONE_ID: ${{ vars.MIRIAD_PREVIEW_ZONE_ID }}
+      - name: Verify homelab schema was applied for this build
+        run: pnpm --dir backend/packages/cloudflare check:schema
+        env:
+          MIRIAD_SCHEMA_SHA256: ${{ vars.MIRIAD_SCHEMA_SHA256 }}
       - name: Configure Worker secrets
         run: pnpm --dir backend/packages/cloudflare exec node scripts/configure-secrets.mjs
         env:
           MIRIAD_WORKER_SECRETS: ${{ secrets.MIRIAD_WORKER_SECRETS }}
-      - name: Expand database schema
-        run: pnpm --dir backend/packages/cloudflare migrate
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Deploy Worker and Sandbox image
         run: pnpm --dir backend/packages/cloudflare exec wrangler deploy --config wrangler.staging.generated.json
       - name: Record deployment

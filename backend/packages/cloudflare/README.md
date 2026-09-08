@@ -31,9 +31,9 @@ Target account: Rémi Org (`f14987cb2f1db42ebfde241a23700328`). Created buckets:
 - `miriad-staging-assets`
 - `miriad-staging-checkpoints`
 
-Configure an isolated PostgreSQL database and a Hyperdrive connection with **query caching disabled**. The `HYPERDRIVE` binding is generated once its real ID is available; no fake ID is checked in. `DATABASE_URL` is an optional direct local-development connection, not the production pooling configuration.
+The homelab PostgreSQL database and Hyperdrive connection are configured with **query caching disabled**; see [the homelab runbook](../../../docs/homelab-postgres.md). The `HYPERDRIVE` binding is generated once its real ID is available; no fake ID is checked in. `DATABASE_URL` is an optional direct local-development connection, not the production pooling configuration.
 
-Create a self-hosted Cloudflare Access application for `os.prescottandremi.com` in Rémi Org. Allow only the approved owner email, with an eight-hour session. Use the account's identity provider or email one-time PIN. Record the team hostname and application AUD. The Worker verifies the RS256 signature, issuer, AUD, expiry and user claims on every browser request, including static assets and WebSocket upgrades. It never trusts the email header alone or an old app cookie.
+Create a self-hosted Cloudflare Access application for `os.prescottandremi.com` in Rémi Org. Allow only the approved owner email, with a six-hour session. Use the account's identity provider or email one-time PIN. Record the team hostname and application AUD. The Worker verifies the RS256 signature, issuer, AUD, expiry and user claims on every browser request, including static assets and WebSocket upgrades. It never trusts the email header alone or an old app cookie.
 
 First authenticated API use atomically creates an Access-specific Miriad identity, space and bundled content. A PostgreSQL advisory lock prevents concurrent first requests from creating duplicate spaces. Existing WorkOS users are not linked by email. The Worker supplies an internal session to existing handlers, bounded by Access token expiry. Logout uses `/cdn-cgi/access/logout`. Access policy revocation is subject to token/session lifetime; existing WebSockets stop accepting messages/broadcasts at token expiry.
 
@@ -52,13 +52,13 @@ In the GitHub environment `cloudflare-staging`, set:
 | Variable | `MIRIAD_APP_ORIGIN` | HTTPS app origin |
 | Variable | `MIRIAD_PREVIEW_DOMAIN` | Separate preview hostname, e.g. previews.example.com |
 | Variable | `MIRIAD_PREVIEW_ZONE_ID` | Cloudflare zone ID for that hostname |
-| Secret | `DATABASE_URL` | Direct staging connection for migrations |
+| Variable | `MIRIAD_SCHEMA_SHA256` | Successful homelab migration bundle hash; recorded by `migrate:homelab --record` |
 | Secret | `CLOUDFLARE_API_TOKEN` | Deployment token scoped to Rémi Org |
 | Secret | `MIRIAD_WORKER_SECRETS` | JSON object containing the Worker secrets below |
 
 Worker secrets: `JWT_SECRET`, `SECRET_KEY`, `CAST_SERVER_SECRET`, `CAST_CONTAINER_SECRET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `PREVIEW_SECRET`. Use independent random values of at least 32 characters for signing/encryption secrets. R2 S3 credentials must be restricted to the checkpoint bucket. The account and bucket name are nonsecret configuration. Model keys can be entered through Miriad Settings; `ANTHROPIC_API_KEY` is an optional Worker fallback.
 
-Run the manual **Cloudflare staging** workflow after configuring these inputs. It builds/tests, generates deployment config, installs secrets, applies additive database migrations and deploys the Worker/container image. Old AWS/Fly/Vercel/npm publishing workflows are archived under `docs/legacy-deployment`; they no longer trigger in this fork.
+Run `pnpm --dir backend/packages/cloudflare migrate:homelab --record` from a trusted machine with `ssh homelab` access before deploying a changed migration bundle. Credentials remain in the database container. Then run the manual **Cloudflare staging** workflow after configuring the remaining inputs. It builds/tests, generates deployment config, checks the recorded migration hash, installs secrets and deploys the Worker/container image. GitHub hosted runners do not connect directly to the private database. Old AWS/Fly/Vercel/npm publishing workflows are archived under `docs/legacy-deployment`; they no longer trigger in this fork.
 
 Docker is required for the image build. The image preserves the Sandbox control-service entrypoint; Miriad starts separately through `runuser`. The SDK and image are pinned to 0.12.9. CI builds the Linux image from the repository root. Start with a maximum of two standard-1 instances; this is staging capacity, not a production sizing recommendation.
 
