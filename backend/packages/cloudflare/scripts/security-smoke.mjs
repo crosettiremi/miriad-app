@@ -70,17 +70,19 @@ try {
     JSON.stringify({ type: 'cf_agent_state', state: { compromised: true } }),
   );
   assert.equal((await reply).type, 'cf_agent_state_error');
+  for (const method of ['startHosted', 'inferModel']) {
   reply = next();
   socket.send(
     JSON.stringify({
       type: 'rpc',
       id: 'attack',
-      method: 'startHosted',
+      method,
       args: ['alice'],
     }),
   );
   const rpc = await reply;
   assert.match(JSON.stringify(rpc), /not callable/);
+  }
   socket.close();
   const foreign = await mf.dispatchFetch('http://localhost/connect?foreign=1', {
     headers: { Upgrade: 'websocket' },

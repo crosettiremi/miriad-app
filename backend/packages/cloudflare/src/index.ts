@@ -10,6 +10,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { getAgentByName } from 'agents';
 import { createApp } from '@cast/server/app-core';
 import { authenticate } from './auth.js';
+import { readInferenceInput } from './workers-ai.js';
 import { openStorage } from './postgres.js';
 import { createR2AssetStorage } from './r2-assets.js';
 import { createBridge } from './bridge.js';
@@ -127,6 +128,21 @@ export default {
       );
       if (runtimeHost && (!principal || principal.role === 'browser'))
         return new Response('Unauthorized', { status: 401 });
+      if (url.pathname === '/api/ai/chat/completions') {
+        if (!runtimeHost || principal?.role !== 'runtime')
+          return new Response('Runtime credentials required', { status: 401 });
+        if (request.method !== 'POST')
+          return new Response('Method not allowed', { status: 405, headers: { Allow: 'POST' } });
+        let input;
+        try { input = await readInferenceInput(request); }
+        catch { return Response.json({ error: 'Invalid or oversized model request' }, { status: 400 }); }
+        const agent = await getAgentByName(env.SPACES, principal.spaceId);
+        const result = await agent.inferModel(principal, input);
+        return Response.json(result.body, {
+          status: result.status,
+          headers: { 'Cache-Control': 'no-store' },
+        });
+      }
       if (websocket) {
         if (!principal || principal.role === 'container')
           return new Response('Unauthorized', { status: 401 });
@@ -197,6 +213,7 @@ export default {
         return c.json({ error: 'Not found' }, 404);
       });
       const app = createApp({
+        platformMcpUrl: env.RUNTIME_ORIGIN,
         storage: db.storage,
         ...createBridge(env, db.storage, spaceId),
         assetStorage: createR2AssetStorage(env.ASSET_BUCKET, spaceId),

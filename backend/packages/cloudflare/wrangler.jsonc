@@ -62,7 +62,9 @@
     "AUTH_MODE": "access",
     "CONTENT_SOURCE": "bundled",
     "CLOUDFLARE_ACCOUNT_ID": "f14987cb2f1db42ebfde241a23700328",
-    "BACKUP_BUCKET_NAME": "miriad-staging-checkpoints"
+    "BACKUP_BUCKET_NAME": "miriad-staging-checkpoints",
+    "HOSTED_ENGINE": "workers-ai",
+    "WORKERS_AI_MODEL": "@cf/qwen/qwen3.8-27b"
   },
   "workers_dev": false,
   "preview_urls": false,

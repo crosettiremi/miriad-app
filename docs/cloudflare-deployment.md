@@ -24,7 +24,7 @@ Passed in the deployed environment:
 - An isolated Sandbox created an R2 checkpoint, was destroyed, and restored on cold start. Git history, untracked files, executable mode, symlink, session file and post-restore writes as `agent` were verified. Probe containers and checkpoint objects were removed.
 - Local frontend build and seven Access routing tests passed. Prior branch CI passed backend tests/builds, workerd security checks, PostgreSQL integration checks, migration tooling tests and Linux image checks.
 
-Still requires owner setup: complete the first-run responsibility acknowledgment and enter a model key in Miriad Settings. No Anthropic fallback key was installed. A real model turn, application-level restart/replay and authenticated preview WebSocket session have not yet been verified. The isolated Sandbox recovery test does not substitute for that application release gate.
+The Workers AI adapter removes the model-key requirement. A real authenticated inference/tool turn and session resume passed. In-app hosted runtime startup and authenticated preview WebSocket verification are tracked separately from the isolated Sandbox recovery check. See [Workers AI runtime](workers-ai-runtime.md).
 
 ## Secrets and future deployments
 
@@ -52,6 +52,6 @@ Keep secrets and bindings consistent during rollback. Database migrations are ad
 
 The Worker now has a typed `env.AI` binding in the tracked Wrangler configuration and the deployed staging configuration. Type checking passed. A temporary remote Worker in Rémi Org successfully called `@cf/qwen/qwen3-30b-a3b-fp8` through this binding and received `READY`; no model API key was supplied. The temporary verification session was stopped afterward. The Sandbox image was preserved with `--containers-rollout=none`.
 
-This installs the inference capability but does not switch the existing Claude Agent SDK runtime. Its Anthropic key gate and tool/session implementation are still present. Cloudflare-hosted model support requires a runtime/provider adapter; Claude through AI Gateway is a separate option. Do not treat the binding as an Anthropic API key or bypass the key gate with a fake credential.
+The hosted runtime now selects the Workers AI adapter, with Qwen 3.8 27B and no Anthropic key. The legacy Claude SDK path remains for other runtime configurations. The initial keyless inference-only setup has been superseded by the [runtime adapter](workers-ai-runtime.md).
 
 Reference: [Workers AI binding](https://developers.cloudflare.com/workers-ai/configuration/bindings/).

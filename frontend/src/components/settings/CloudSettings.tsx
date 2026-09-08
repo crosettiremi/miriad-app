@@ -19,6 +19,7 @@ interface CloudSettingsProps {
 }
 
 export function CloudSettings({ apiHost, spaceId }: CloudSettingsProps) {
+  const [workersModel, setWorkersModel] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -31,6 +32,8 @@ export function CloudSettings({ apiHost, spaceId }: CloudSettingsProps) {
   useEffect(() => {
     async function loadSecrets() {
       try {
+        const status = await apiJson<{ modelProvider?: string; model?: string }>(`${apiHost}/api/runtimes/miriad-cloud/status`).catch(() => null)
+        if (status?.modelProvider === 'workers-ai') { setWorkersModel(status.model ?? 'Workers AI'); return }
         const data = await apiJson<SecretsListResponse>(
           `${apiHost}/api/spaces/${spaceId}/secrets`
         )
@@ -105,6 +108,15 @@ export function CloudSettings({ apiHost, spaceId }: CloudSettingsProps) {
       </div>
     )
   }
+
+  if (workersModel) return (
+    <div className="space-y-3">
+      <h3 className="text-lg font-medium">Miriad Cloud</h3>
+      <p>Agents use Cloudflare Workers AI. No model API key is required.</p>
+      <p className="text-sm text-muted-foreground">Model: {workersModel}</p>
+      <p className="text-sm text-muted-foreground">Start Miriad Cloud from the Runtimes menu. Model usage is billed to your Cloudflare account.</p>
+    </div>
+  )
 
   return (
     <div className="space-y-6">

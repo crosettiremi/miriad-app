@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-const fakes = vi.hoisted(() => ({ verify: vi.fn(), storage: vi.fn() }));
+const fakes = vi.hoisted(() => ({ verify: vi.fn(), storage: vi.fn(), agent: vi.fn() }));
 vi.mock('./access.js', () => ({
   verifyAccess: fakes.verify,
   accessSessionRequest: vi.fn(),
@@ -7,7 +7,7 @@ vi.mock('./access.js', () => ({
   provisionAccessUser: vi.fn(),
 }));
 vi.mock('./postgres.js', () => ({ openStorage: fakes.storage }));
-vi.mock('agents', () => ({ getAgentByName: vi.fn() }));
+vi.mock('agents', () => ({ getAgentByName: fakes.agent }));
 vi.mock('./space-agent.js', () => ({ SpaceAgent: class {} }));
 vi.mock('@cloudflare/sandbox', () => ({ Sandbox: class {} }));
 vi.mock('@cast/server/app-core', () => ({ createApp: vi.fn() }));
@@ -96,6 +96,29 @@ describe('Access origin enforcement', () => {
       expect(assets).toHaveBeenCalledWith(request);
     }
     expect(fakes.storage).not.toHaveBeenCalled();
+  });
+  it('rejects anonymous inference without opening the model binding', async () => {
+    const response = await worker.fetch(new Request(env.RUNTIME_ORIGIN + '/api/ai/chat/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }), env);
+    expect(response.status).toBe(401);
+    expect(fakes.agent).not.toHaveBeenCalled();
+  });
+  it('routes authenticated runtime inference to its own space only', async () => {
+    const close = vi.fn();
+    fakes.storage.mockReturnValue({ storage: { getLocalAgentServerBySecret: vi.fn(async () => ({
+      serverId: 'srv', spaceId: 'space', userId: 'owner',
+    })) }, close });
+    const inferModel = vi.fn(async () => ({ status: 200, body: { choices: [] } }));
+    fakes.agent.mockResolvedValue({ inferModel });
+    const response = await worker.fetch(new Request(env.RUNTIME_ORIGIN + '/api/ai/chat/completions', {
+      method: 'POST', headers: { Authorization: 'Server valid', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'hello' }] }),
+    }), env);
+    expect(response.status).toBe(200);
+    expect(fakes.agent).toHaveBeenCalledWith(env.SPACES, 'space');
+    expect(inferModel).toHaveBeenCalledWith(expect.objectContaining({ role: 'runtime', spaceId: 'space' }), expect.anything());
+    expect(close).toHaveBeenCalled();
   });
   it('logs out through Access instead of WorkOS', async () => {
     fakes.verify.mockResolvedValue({ subject: 'owner' });

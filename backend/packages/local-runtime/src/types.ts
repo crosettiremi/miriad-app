@@ -273,7 +273,7 @@ export interface AgentState {
   /** Per-request environment variables and secrets */
   environment?: Record<string, string>;
   /** Engine used for this agent */
-  engine: 'claude-sdk' | 'nuum';
+  engine: 'claude-sdk' | 'nuum' | 'workers-ai';
   activatedAt: string;
   lastActivity: string;
 }

@@ -89,7 +89,12 @@ async function cmdAuth(args: string[]): Promise<void> {
 
 async function cmdStart(args: string[]): Promise<void> {
   // Validate API key
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (process.env.MIRIAD_ENGINE === 'workers-ai') {
+    if (!process.env.MIRIAD_AI_URL || !process.env.MIRIAD_AI_TOKEN) {
+      console.error('Error: Workers AI runtime endpoint and credential are required');
+      process.exit(1);
+    }
+  } else if (!process.env.ANTHROPIC_API_KEY) {
     console.error('Error: ANTHROPIC_API_KEY environment variable is required');
     process.exit(1);
   }

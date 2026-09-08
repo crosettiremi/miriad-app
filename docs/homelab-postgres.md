@@ -63,4 +63,4 @@ For a restore rehearsal, verify `SHA256SUMS`, copy `database.dump` to CT 116 as 
 
 A real Cloudflare remote Worker used the application's Postgres.js adapter and Hyperdrive binding to verify database/role/UTF-8 encoding, all 13 tables, an application-role insert/read, and transaction rollback. The temporary remote development session was stopped afterward. PostgreSQL stayed bound to localhost and the guest had no failed systemd units after reboot.
 
-Worker/Sandbox deployment, browser Access login, and an isolated deployed Sandbox checkpoint/restore have passed. The owner must complete first-run acknowledgment and supply a model key before a real agent turn can be verified. Database availability depends on the homelab's power, Internet connection, PostgreSQL and dedicated Tunnel.
+Worker/Sandbox deployment, browser Access login, and an isolated deployed Sandbox checkpoint/restore have passed. The Workers AI adapter now provides keyless model access; authenticated tool execution and session resume have passed. Database availability depends on the homelab's power, Internet connection, PostgreSQL and dedicated Tunnel.

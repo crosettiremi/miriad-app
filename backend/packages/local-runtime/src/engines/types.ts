@@ -47,6 +47,8 @@ export type EngineProcessState =
   | 'terminated'; // Process ended
 
 export interface EngineMessage {
+  /** Per-turn artifact environment; runtime credentials must take precedence. */
+  environment?: Record<string, string>;
   type: 'user' | 'control';
   /** User message content */
   content?: string;
@@ -106,7 +108,7 @@ export interface AgentEngine {
 // =============================================================================
 
 /** Known engine IDs */
-export type EngineId = 'claude-sdk' | 'nuum';
+export type EngineId = 'claude-sdk' | 'nuum' | 'workers-ai';
 
 /** Default engine when none specified */
 export const DEFAULT_ENGINE_ID: EngineId = 'claude-sdk';
