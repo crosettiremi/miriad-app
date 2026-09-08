@@ -3,7 +3,7 @@
 Deployed on 2026-09-08 to Rémi Org (`f14987cb2f1db42ebfde241a23700328`).
 
 - App: https://os.prescottandremi.com — Cloudflare Access, owner `crosettiremi@gmail.com`.
-- Worker: `miriad-staging`; deployed version `886ceae1-be97-4c98-b82b-79983624b3aa`. Agents SDK coordinates spaces in Durable Objects.
+- Worker: `miriad-staging`; deployed version `e0ec5429-a67c-4353-bc9e-62305850f7fa`. Agents SDK coordinates spaces in Durable Objects.
 - Runtime: https://runtime.os.prescottandremi.com — machine credentials required, browser sessions rejected.
 - Sandbox: `miriad-staging-sandbox`, SDK/image 0.12.9, at most two standard-1 instances.
 - Workspace checkpoints: `miriad-staging-checkpoints` R2 bucket. S3 credentials have object read/write permission only on this bucket.
@@ -47,3 +47,11 @@ DOCKER_HOST=ssh://openhands wrangler deploy --config wrangler.staging.generated.
 ```
 
 Keep secrets and bindings consistent during rollback. Database migrations are additive and are not rolled back by a Worker rollback. PostgreSQL availability depends on homelab power and networking; current database backups remain on the same physical server, on another storage pool.
+
+## Workers AI binding — 2026-09-08
+
+The Worker now has a typed `env.AI` binding in the tracked Wrangler configuration and the deployed staging configuration. Type checking passed. A temporary remote Worker in Rémi Org successfully called `@cf/qwen/qwen3-30b-a3b-fp8` through this binding and received `READY`; no model API key was supplied. The temporary verification session was stopped afterward. The Sandbox image was preserved with `--containers-rollout=none`.
+
+This installs the inference capability but does not switch the existing Claude Agent SDK runtime. Its Anthropic key gate and tool/session implementation are still present. Cloudflare-hosted model support requires a runtime/provider adapter; Claude through AI Gateway is a separate option. Do not treat the binding as an Anthropic API key or bypass the key gate with a fake credential.
+
+Reference: [Workers AI binding](https://developers.cloudflare.com/workers-ai/configuration/bindings/).
