@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 describe('Access origin enforcement', () => {
   it('protects static assets as well as API and WebSocket requests', async () => {
-    for (const path of ['/', '/auth/me', '/connect']) {
+    for (const path of ['/', '/static/index.js', '/static/index.css', '/auth/me', '/connect']) {
       const response = await worker.fetch(
         new Request(env.APP_ORIGIN + path, {
           headers: path === '/connect' ? { Upgrade: 'websocket' } : {},
@@ -86,6 +86,15 @@ describe('Access origin enforcement', () => {
     expect(
       await (await worker.fetch(new Request(env.APP_ORIGIN + '/'), env)).text(),
     ).toBe('private app');
+    expect(fakes.storage).not.toHaveBeenCalled();
+  });
+  it('serves frontend bundles through the static binding without opening PostgreSQL', async () => {
+    fakes.verify.mockResolvedValue({ subject: 'owner' });
+    for (const path of ['/static/index.js', '/static/index.css']) {
+      const request = new Request(env.APP_ORIGIN + path);
+      expect(await (await worker.fetch(request, env)).text()).toBe('private app');
+      expect(assets).toHaveBeenCalledWith(request);
+    }
     expect(fakes.storage).not.toHaveBeenCalled();
   });
   it('logs out through Access instead of WorkOS', async () => {

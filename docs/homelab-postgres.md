@@ -1,6 +1,6 @@
 # Miriad homelab PostgreSQL
 
-Provisioned and verified on 2026-09-08. The database is ready; the complete Miriad Worker/Sandbox application is not deployed yet.
+Provisioned and verified on 2026-09-08. The database and Miriad Worker/Sandbox application are deployed. See [deployment status](cloudflare-deployment.md) for verified gates and remaining user setup.
 
 ## Inventory
 
@@ -37,7 +37,7 @@ This bundles the current migration code and dependencies, sends it through SSH t
 
 The staging workflow rebuilds the same bundle and rejects a missing or mismatched hash before modifying Worker secrets or deploying. This is an operator attestation, not a live database availability/schema query. Rerun the migration after restoring an older database. Do not manually copy an old hash onto a changed database. Dependencies are part of the bundle, so a dependency change may require replaying the additive migration.
 
-The workflow no longer requires a `DATABASE_URL` GitHub secret. `MIRIAD_HYPERDRIVE_ID` is already set. Cloudflare deployment and R2 checkpoint secrets remain separate setup work.
+The workflow no longer requires a `DATABASE_URL` GitHub secret. `MIRIAD_HYPERDRIVE_ID` is already set. Worker signing/encryption and bucket-scoped R2 checkpoint secrets are installed and backed up in `MIRIAD_WORKER_SECRETS`. GitHub workflow deployment still requires its scoped `CLOUDFLARE_API_TOKEN`; the initial deployment used local Wrangler OAuth.
 
 ## Backups and restore
 
@@ -63,4 +63,4 @@ For a restore rehearsal, verify `SHA256SUMS`, copy `database.dump` to CT 116 as 
 
 A real Cloudflare remote Worker used the application's Postgres.js adapter and Hyperdrive binding to verify database/role/UTF-8 encoding, all 13 tables, an application-role insert/read, and transaction rollback. The temporary remote development session was stopped afterward. PostgreSQL stayed bound to localhost and the guest had no failed systemd units after reboot.
 
-The app still needs Worker/Sandbox deployment, remaining signing/R2 credentials, browser Access login validation, and the live agent/recovery release gate. Database availability depends on the homelab's power, Internet connection, PostgreSQL and dedicated Tunnel.
+Worker/Sandbox deployment, browser Access login, and an isolated deployed Sandbox checkpoint/restore have passed. The owner must complete first-run acknowledgment and supply a model key before a real agent turn can be verified. Database availability depends on the homelab's power, Internet connection, PostgreSQL and dedicated Tunnel.

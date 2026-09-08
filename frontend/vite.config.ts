@@ -6,6 +6,10 @@ const BACKEND_URL = process.env.VITE_BACKEND_URL ?? ''
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  build: {
+    // /assets belongs to the backend API on the shared production origin.
+    assetsDir: 'static',
+  },
   // Define backend URL as compile-time constant - single source of truth
   define: {
     'import.meta.env.VITE_BACKEND_URL': JSON.stringify(BACKEND_URL),
