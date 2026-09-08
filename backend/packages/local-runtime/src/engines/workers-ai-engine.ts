@@ -19,6 +19,8 @@ type ToolResult = { text: string; error?: boolean };
 const MAX_REQUEST_BYTES = 128 * 1024;
 const TOOL_OUTPUT_BYTES = 8_000;
 const MAX_ROUNDS = 24;
+const MAX_HISTORY_MESSAGES = 510;
+const MAX_TOOLS = 128;
 const INFERENCE_TIMEOUT = 240_000;
 const RECOVERED_TOOL = 'Interrupted before the tool result was durably recorded. Its effects are unknown. Do not blindly repeat it; inspect the current state first.';
 
@@ -55,7 +57,8 @@ export function fitContext(messages: AIMessage[], overheadBytes: number, budget 
   }
   let truncated = false;
   const size = () => Buffer.byteLength(JSON.stringify(groups.flat())) + overheadBytes;
-  while (size() > budget && groups.length > 1) {
+  const count = () => groups.reduce((total, group) => total + group.length, 0);
+  while ((size() > budget || count() > MAX_HISTORY_MESSAGES) && groups.length > 1) {
     let lastUser = -1;
     groups.forEach((group, index) => { if (group[0].role === 'user') lastUser = index; });
     // Keep the most recent user request and final group; remove complete call/result groups.
@@ -64,6 +67,7 @@ export function fitContext(messages: AIMessage[], overheadBytes: number, budget 
     groups.splice(removable, 1);
     truncated = true;
   }
+  if (count() > MAX_HISTORY_MESSAGES) throw new Error('The current tool group exceeds the Workers AI message limit');
   if (size() > budget) throw new Error('The current request and tool definitions exceed the Workers AI context budget. Shorten the request or reduce the configured MCP tools.');
   return { messages: groups.flat(), truncated };
 }
@@ -188,7 +192,7 @@ export class WorkersAIProcess implements EngineProcess {
   }
 
   private emit(message: Record<string, unknown>): void {
-    const event = { uuid: randomUUID(), ...message } as unknown as SDKMessage;
+    const event = { uuid: randomUUID(), ...message, ...(message.type === 'result' ? { miriad_pending: this.queue.length > 0 } : {}) } as unknown as SDKMessage;
     if (this.waiting) { const resolve = this.waiting; this.waiting = undefined; resolve({ value: event, done: false }); }
     else this.outputQueue.push(event);
   }
@@ -227,6 +231,7 @@ export class WorkersAIProcess implements EngineProcess {
           if (++pages > 20) throw new Error(`MCP ${server.name}: excessive tool listing pages`);
           const listed = await client.listTools({ cursor }, { signal, timeout: 30_000 });
           for (const definition of listed.tools) {
+            if (this.tools.length >= MAX_TOOLS) throw new Error(`Workers AI supports at most ${MAX_TOOLS} tools including built-ins. Reduce the configured MCP tools.`);
             const name = `mcp_${index}_${this.mcpTools.size}_${definition.name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)}`;
             this.mcpTools.set(name, { client, name: definition.name });
             this.tools.push({ type: 'function', function: { name, description: bounded(`${server.name}: ${definition.description ?? definition.name}`, 1000), parameters: definition.inputSchema as Record<string, unknown> } });

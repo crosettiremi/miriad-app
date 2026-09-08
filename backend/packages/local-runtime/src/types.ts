@@ -186,6 +186,8 @@ export interface ToolResultValue extends TymbalValueBase {
 export interface ErrorValue extends TymbalValueBase {
   type: 'error';
   content: string;
+  /** Another agent turn is queued; this error does not indicate idle. */
+  pending?: boolean;
 }
 
 export interface IdleValue extends TymbalValueBase {

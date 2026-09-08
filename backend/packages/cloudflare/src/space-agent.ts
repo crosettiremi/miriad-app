@@ -293,7 +293,8 @@ export class SpaceAgent extends Agent<Env> {
             'v' in event.frame &&
             event.frame.v &&
             typeof event.frame.v === 'object' &&
-            ['idle', 'error'].includes(String(event.frame.v.type))
+            ['idle', 'error'].includes(String(event.frame.v.type)) &&
+            !(event.frame.v.type === 'error' && event.frame.v.pending === true)
           ) {
             const active =
               (await this.ctx.storage.get<string[]>('activeAgents')) ?? [];

@@ -350,7 +350,8 @@ export class AgentManager {
       for await (const message of instance.engineProcess.output) {
         await instance.bridge.processSDKMessage(message);
         if (message.type === 'result' && instance.state.status !== 'offline') {
-          instance.state.status = message.is_error ? 'error' : 'online';
+          const pending = (message as typeof message & { miriad_pending?: boolean }).miriad_pending === true;
+          instance.state.status = pending ? 'busy' : message.is_error ? 'error' : 'online';
           instance.state.lastActivity = new Date().toISOString();
           if (message.is_error)
             this.config.onError?.(instance.state.agentId, new Error('Agent turn failed; inspect its error result'));

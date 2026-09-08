@@ -180,3 +180,57 @@ it('calls a configured real stdio MCP server and preserves structured/error resu
   expect(events.find(e => e.type === 'user').message.content[0]).toMatchObject({ tool_use_id: 'mcp-call', is_error: true });
   expect(events.at(-1).subtype).toBe('success');
 });
+
+it('trims message count even when short history fits the byte budget without orphaning tool results', () => {
+  const messages: AIMessage[] = [];
+  for (let i = 0; i < 180; i++) {
+    messages.push(
+      { role: 'user', content: `request ${i}` },
+      { role: 'assistant', content: null, tool_calls: [{ id: `call-${i}`, type: 'function', function: { name: 'Read', arguments: '{}' } }] },
+      { role: 'tool', tool_call_id: `call-${i}`, content: 'ok' },
+    );
+  }
+  expect(Buffer.byteLength(JSON.stringify(messages))).toBeLessThan(128 * 1024);
+  const fitted = fitContext(messages, 100);
+  expect(fitted.truncated).toBe(true);
+  expect(fitted.messages.length).toBeLessThanOrEqual(510);
+  expect(fitted.messages.slice(-3)).toEqual(messages.slice(-3));
+  expect(recoverPendingTools(fitted.messages)).toEqual(fitted.messages);
+});
+
+it.each([false, true])('marks a result pending when another turn is queued, including failure=%s', async (failFirst) => {
+  let release!: (response: Response) => void;
+  let started!: () => void;
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  vi.stubGlobal('fetch', vi.fn()
+    .mockImplementationOnce(() => { started(); return new Promise<Response>(resolve => { release = resolve; }); })
+    .mockResolvedValueOnce(completion('Second completed')));
+  const process = await engine();
+  process.send({ type: 'user', content: 'First turn' });
+  await ready;
+  process.send({ type: 'user', content: 'Second turn' });
+  release(failFirst ? new Response('unavailable', { status: 503 }) : completion('First completed'));
+  const results: any[] = [];
+  for await (const event of process.output) {
+    if (event.type === 'result') results.push(event);
+    if (results.length === 2) break;
+  }
+  expect(results[0]).toMatchObject({ miriad_pending: true, is_error: failFirst });
+  expect(results[1]).toMatchObject({ miriad_pending: false, is_error: false });
+});
+
+it('rejects too many MCP tools before sending a model request', async () => {
+  const fixture = join(workspace, 'many-tools.mjs');
+  const sdkRoot = pathToFileURL(createRequire(import.meta.url).resolve('@modelcontextprotocol/sdk/server/index.js')).href;
+  const transport = new URL('./stdio.js', sdkRoot).href;
+  const schemas = new URL('../types.js', sdkRoot).href;
+  await writeFile(fixture, `import {Server} from ${JSON.stringify(sdkRoot)}; import {StdioServerTransport} from ${JSON.stringify(transport)}; import {ListToolsRequestSchema} from ${JSON.stringify(schemas)};
+  const server = new Server({name:'fixture',version:'1'}, {capabilities:{tools:{}}});
+  server.setRequestHandler(ListToolsRequestSchema, async()=>({tools:Array.from({length:125},(_,i)=>({name:'tool_'+i,inputSchema:{type:'object',properties:{}}}))}));
+  await server.connect(new StdioServerTransport());`);
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  const events = await readTurn(await engine({ mcpServers: [{ name: 'fixture', transport: 'stdio', command: process.execPath, args: [fixture] }] }));
+  expect(events.at(-1)).toMatchObject({ is_error: true, errors: [expect.stringContaining('128 tools')] });
+  expect(fetch).not.toHaveBeenCalled();
+});

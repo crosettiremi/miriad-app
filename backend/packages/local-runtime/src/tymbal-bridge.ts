@@ -253,6 +253,7 @@ export class TymbalBridge {
   }
 
   private async handleResult(message: SDKResultMessage): Promise<void> {
+    const pending = (message as SDKResultMessage & { miriad_pending?: boolean }).miriad_pending === true;
     // Finalize pending assistant message
     if (this.currentAssistantMsgId && this.assistantContent) {
       await this.emitFrame({
@@ -283,6 +284,7 @@ export class TymbalBridge {
           sender: this.callsign,
           senderType: 'agent',
           content: errorMessage,
+          ...(pending ? { pending: true } : {}),
         },
       });
     }
@@ -327,6 +329,9 @@ export class TymbalBridge {
     console.log(
       `[TymbalBridge:${this.callsign}] Cost: $${(message.total_cost_usd ?? 0).toFixed(4)} (${message.num_turns ?? 1} turns)`
     );
+
+    // A completed turn can have another turn queued behind it.
+    if (pending) return;
 
     // Emit idle frame (signals processing complete)
     await this.emitFrame({
