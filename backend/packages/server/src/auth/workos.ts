@@ -10,6 +10,7 @@
 import { Hono } from 'hono';
 import { WorkOS } from '@workos-inc/node';
 import { sign, verify } from 'hono/jwt';
+import { createOAuthState, consumeOAuthState } from './oauth-state.js';
 import type { Storage } from '@cast/storage';
 import {
   createSession,
@@ -210,8 +211,7 @@ export function createWorkOSAuthRoutes(options: WorkOSAuthOptions): Hono {
       const workos = new WorkOS(config.apiKey);
 
       // Store returnTo in state for post-auth redirect
-      const returnTo = c.req.query('returnTo') || '/';
-      const state = Buffer.from(JSON.stringify({ returnTo })).toString('base64url');
+      const state = await createOAuthState(c, c.req.query('returnTo'), getJwtSecret());
 
       const authorizationUrl = workos.userManagement.getAuthorizationUrl({
         clientId: config.clientId,
@@ -242,6 +242,10 @@ export function createWorkOSAuthRoutes(options: WorkOSAuthOptions): Hono {
     const errorDescription = c.req.query('error_description');
 
     const frontendUrl = getFrontendUrl();
+    const returnTo = await consumeOAuthState(c, state, getJwtSecret());
+    if (returnTo === null) {
+      return c.redirect(`${frontendUrl}/auth-error?error=invalid_state`);
+    }
 
     // Handle OAuth errors
     if (error) {
@@ -268,17 +272,6 @@ export function createWorkOSAuthRoutes(options: WorkOSAuthOptions): Hono {
       const accessTokenPayload = decodeJwtPayload(authResult.accessToken);
       const workosSessionId = accessTokenPayload?.sid as string | undefined;
 
-
-      // Parse state to get returnTo
-      let returnTo = '/';
-      if (state) {
-        try {
-          const stateData = JSON.parse(Buffer.from(state, 'base64url').toString());
-          returnTo = stateData.returnTo || '/';
-        } catch {
-          // Invalid state, use default returnTo
-        }
-      }
 
       // Check if user already exists
       const existingUser = await storage.getUserByExternalId(`workos:${workosUser.id}`);
