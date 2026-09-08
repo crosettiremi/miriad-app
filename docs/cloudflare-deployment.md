@@ -3,7 +3,7 @@
 Deployed on 2026-09-08 to Rémi Org (`f14987cb2f1db42ebfde241a23700328`).
 
 - App: https://os.prescottandremi.com — Cloudflare Access, owner `crosettiremi@gmail.com`.
-- Worker: `miriad-staging`; deployed version `e0ec5429-a67c-4353-bc9e-62305850f7fa`. Agents SDK coordinates spaces in Durable Objects.
+- Worker: `miriad-staging`; deployed version `7036c65c-02da-43ff-97aa-26ca34d9a208`. Agents SDK coordinates spaces in Durable Objects.
 - Runtime: https://runtime.os.prescottandremi.com — machine credentials required, browser sessions rejected.
 - Sandbox: `miriad-staging-sandbox`, SDK/image 0.12.9, at most two standard-1 instances.
 - Workspace checkpoints: `miriad-staging-checkpoints` R2 bucket. S3 credentials have object read/write permission only on this bucket.
@@ -22,9 +22,9 @@ Passed in the deployed environment:
 - Anonymous app access redirects to Access. Runtime browser-auth endpoints and ungranted preview URLs return 401. The workers.dev alternative returns 404.
 - Runtime executable works as the non-root `agent` user in the deployed Sandbox image.
 - An isolated Sandbox created an R2 checkpoint, was destroyed, and restored on cold start. Git history, untracked files, executable mode, symlink, session file and post-restore writes as `agent` were verified. Probe containers and checkpoint objects were removed.
-- Local frontend build and seven Access routing tests passed. Prior branch CI passed backend tests/builds, workerd security checks, PostgreSQL integration checks, migration tooling tests and Linux image checks.
+- Local frontend build, 621 backend tests (56 legacy skips), nine Access routing tests and real workerd Agents SDK security checks passed. Prior branch CI passed backend tests/builds, workerd security checks, PostgreSQL integration checks, migration tooling tests and Linux image checks.
 
-The Workers AI adapter removes the model-key requirement. A real authenticated inference/tool turn and session resume passed. In-app hosted runtime startup and authenticated preview WebSocket verification are tracked separately from the isolated Sandbox recovery check. See [Workers AI runtime](workers-ai-runtime.md).
+The Workers AI adapter removes the model-key requirement. A real authenticated inference/tool turn and session resume passed. In-app hosted startup, Write/Read and Miriad MCP calls also passed using the `verify` agent in `first-channel`. After checkpointing and restarting on the updated image, a read-only tool call returned the original `CF_ADAPTER_VERIFIED` file contents. One post-deployment runtime disappearance required another Start and message retry; interrupted requests are not automatically replayed. Authenticated preview WebSocket verification remains separate from these runtime checks. See [Workers AI runtime](workers-ai-runtime.md).
 
 ## Secrets and future deployments
 
@@ -45,6 +45,8 @@ The local image build used `DOCKER_HOST=ssh://openhands` and the existing Docker
 ```sh
 DOCKER_HOST=ssh://openhands wrangler deploy --config wrangler.staging.generated.json
 ```
+
+Stop hosted runtimes through the app before an image rollout so their workspaces are checkpointed. Wait for the container rollout to settle before restarting them: Wrangler success can precede termination of old containers.
 
 Keep secrets and bindings consistent during rollback. Database migrations are additive and are not rolled back by a Worker rollback. PostgreSQL availability depends on homelab power and networking; current database backups remain on the same physical server, on another storage pool.
 
