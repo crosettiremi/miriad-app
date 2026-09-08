@@ -257,11 +257,7 @@ export class SpaceAgent extends Agent<Env> {
             await this.ctx.storage.delete(key);
             connection.send(JSON.stringify({ type: 'frame_ack', operationId }));
           } else await protocol.handleFrame(context, event);
-          await this.ctx.storage.put({
-            lastActivity: Date.now(),
-            activeAgents: [],
-            checkpointFailures: 0,
-          });
+          await this.ctx.storage.put('lastActivity', Date.now());
           if (
             'v' in event.frame &&
             event.frame.v &&
