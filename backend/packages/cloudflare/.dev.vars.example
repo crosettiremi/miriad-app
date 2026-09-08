@@ -1,0 +1,18 @@
+# Local development only. Never use production credentials here.
+DATABASE_URL=postgres://miriad:local-password@localhost:5432/miriad_staging
+APP_ORIGIN=http://localhost:8787
+FRONTEND_URL=http://localhost:8787
+APP_URL=http://localhost:8787
+CAST_API_URL=http://localhost:8787
+JWT_SECRET=replace-with-random-secret
+CAST_SERVER_SECRET=replace-with-random-secret
+CAST_CONTAINER_SECRET=replace-with-random-secret
+SECRET_KEY=replace-with-random-secret
+WORKOS_API_KEY=configure-user-owned-workos-app
+WORKOS_CLIENT_ID=configure-user-owned-workos-app
+WORKOS_REDIRECT_URI=http://localhost:8787/auth/callback
+# Production Sandbox backup service needs bucket-scoped R2 S3 credentials:
+# R2_ACCESS_KEY_ID=
+# R2_SECRET_ACCESS_KEY=
+# CLOUDFLARE_ACCOUNT_ID=f14987cb2f1db42ebfde241a23700328
+# BACKUP_BUCKET_NAME=miriad-staging-checkpoints

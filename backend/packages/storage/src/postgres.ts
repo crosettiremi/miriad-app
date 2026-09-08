@@ -83,7 +83,9 @@ import type { Storage, SetSecretInput } from './interface.js';
 
 export interface PostgresStorageOptions {
   /** PostgreSQL connection string */
-  connectionString: string;
+  connectionString?: string;
+  /** Inject a transport, e.g. Postgres.js via Hyperdrive. */
+  sql?: TypedSql;
 }
 
 /**
@@ -329,7 +331,8 @@ interface RuntimeRow {
 // =============================================================================
 
 export function createPostgresStorage(options: PostgresStorageOptions): Storage {
-  const sql = createPostgresClient(options.connectionString);
+  if (!options.sql && !options.connectionString) throw new Error('PostgreSQL transport is required');
+  const sql = options.sql ?? createPostgresClient(options.connectionString!);
 
   // ---------------------------------------------------------------------------
   // Message Operations

@@ -30,7 +30,7 @@ export async function seedSpaceFromSanity(
   const transformed = transformOnboardingContent(content);
 
   // Create #root channel
-  const rootChannel = await storage.createChannel({
+  const rootChannel = await storage.getChannelByName(spaceId,'root') ?? await storage.createChannel({
     spaceId,
     name: 'root',
     tagline: 'System configuration',
@@ -39,7 +39,7 @@ export async function seedSpaceFromSanity(
 
   // Create MCP servers first (agents reference them)
   for (const mcp of transformed.mcpServers) {
-    await storage.createArtifact(rootChannel.id, {
+    if (!await storage.getArtifact(rootChannel.id, mcp.slug)) await storage.createArtifact(rootChannel.id, {
       ...mcp,
       channelId: rootChannel.id,
     });
@@ -47,7 +47,7 @@ export async function seedSpaceFromSanity(
 
   // Create agent templates
   for (const agent of transformed.agentTemplates) {
-    await storage.createArtifact(rootChannel.id, {
+    if (!await storage.getArtifact(rootChannel.id, agent.slug)) await storage.createArtifact(rootChannel.id, {
       ...agent,
       channelId: rootChannel.id,
     });
@@ -55,14 +55,14 @@ export async function seedSpaceFromSanity(
 
   // Create playbooks
   for (const playbook of transformed.playbooks) {
-    await storage.createArtifact(rootChannel.id, {
+    if (!await storage.getArtifact(rootChannel.id, playbook.slug)) await storage.createArtifact(rootChannel.id, {
       ...playbook,
       channelId: rootChannel.id,
     });
   }
 
   // Create #first-channel as the default working channel
-  await storage.createChannel({
+  if (!await storage.getChannelByName(spaceId,'first-channel')) await storage.createChannel({
     spaceId,
     name: 'first-channel',
     tagline: 'Your first channel',

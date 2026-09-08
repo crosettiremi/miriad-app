@@ -157,6 +157,8 @@ export interface RuntimeConnectionState {
  * This allows the same handlers to work in Lambda and local dev.
  */
 export interface RuntimeProtocolDeps {
+  /** Propagate persistence failures so an enclosing transaction can roll back. */
+  strictPersistence?: boolean;
   /** Storage interface for DB operations */
   storage: Storage;
 
@@ -344,6 +346,7 @@ export function createRuntimeProtocolHandlers(
       });
     } catch (error) {
       console.error('[RuntimeProtocolHandlers] Error persisting frame:', error);
+      if (deps.strictPersistence) throw error;
     }
   }
 
@@ -538,6 +541,7 @@ export function createRuntimeProtocolHandlers(
         }
       } catch (error) {
         console.error('[RuntimeProtocolHandlers] Error handling frame:', error);
+        if (deps.strictPersistence) throw error;
       }
     },
 

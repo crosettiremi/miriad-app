@@ -135,31 +135,8 @@ export async function parseSession(c: Context): Promise<SessionData | null> {
  * Returns undefined for localhost (no domain scoping needed).
  */
 function getCookieDomain(): string | undefined {
-  const frontendUrl = process.env.FRONTEND_URL;
-  if (frontendUrl) {
-    try {
-      const url = new URL(frontendUrl);
-      const hostname = url.hostname;
-      // For localhost, don't set domain
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return undefined;
-      }
-      // Extract root domain (e.g., miriad.tech from app.miriad.tech)
-      const parts = hostname.split('.');
-      if (parts.length >= 2) {
-        return '.' + parts.slice(-2).join('.');
-      }
-      return '.' + hostname;
-    } catch {
-      // Fall through to default
-    }
-  }
-  // Fallback for staging/prod without FRONTEND_URL
-  const stage = process.env.STAGE;
-  if (stage === 'stag' || stage === 'prod') {
-    return '.caststack.ai';
-  }
-  return undefined;
+  // Host-only by default; never infer a registrable domain from hostname labels.
+  return process.env.SESSION_COOKIE_DOMAIN || undefined;
 }
 
 /**

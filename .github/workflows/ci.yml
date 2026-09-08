@@ -1,91 +1,64 @@
-# CI Pipeline - Runs on all pull requests
 name: CI
-
 on:
   pull_request:
-    branches: [main]
-
+  push:
+    branches: [cloudflare-port]
+permissions:
+  contents: read
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
-  backend:
-    name: Backend
+  application:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: miriad_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.15.9
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: backend/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      # TODO: Re-enable after setting up TypeScript project references
-      # - run: pnpm typecheck
-      # - run: pnpm lint
-      - run: pnpm test
-
-  frontend:
-    name: Frontend
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      # TODO: Re-enable after fixing React hooks violations in App.tsx
-      # - run: pnpm lint
-      - run: pnpm build
-
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: |
+            backend/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
+      - run: pnpm --dir backend install --frozen-lockfile
+      - run: pnpm --dir frontend install --frozen-lockfile
+      - run: pnpm --dir backend build
+      - run: pnpm --dir frontend build
+      - run: pnpm --dir backend test
+      - run: pnpm --dir backend/packages/cloudflare test:security
+      - run: pnpm --dir backend/packages/cloudflare test:postgres
+        env:
+          DATABASE_URL: postgres://postgres:local-test-only@localhost:5432/miriad_test
+      - run: pnpm --dir backend/packages/cloudflare exec wrangler deploy --dry-run --containers-rollout=none --outdir dist
   container:
-    name: Agent Container Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Build TypeScript
-        working-directory: agents/sandbox
-        run: npm ci && npm run build
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v5
-        with:
-          context: agents/sandbox
-          platforms: linux/amd64
-          push: false
-          tags: cast-agent:ci-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  tunnel-server:
-    name: Tunnel Server Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v6
         with:
-          context: backend/packages/tunnel-server
+          context: .
+          file: agents/cloudflare/Dockerfile
           platforms: linux/amd64
           push: false
-          tags: cast-tunnel-server:ci-${{ github.sha }}
+          load: true
+          tags: miriad-cloudflare:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Validate runtime executable and non-root workspace access
+        run: |
+          docker run --rm --entrypoint runuser miriad-cloudflare:ci -u agent -- node /opt/miriad/dist/cli.js --help
+          docker run --rm --entrypoint runuser miriad-cloudflare:ci -u agent -- node -e "if(process.getuid()===0)process.exit(1); require('node:fs').accessSync('/workspace',2)"

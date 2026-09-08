@@ -12,10 +12,11 @@
     "test:watch": "vitest",
     "lint": "eslint packages/*/src/**/*.ts",
     "typecheck": "pnpm -r typecheck",
-    "deploy": "cd deploy && ./deploy.sh",
+    "deploy": "pnpm --filter @miriad/cloudflare deploy",
     "publish:backend": "pnpm --filter @miriad-systems/backend build && pnpm --filter @miriad-systems/backend publish --access public",
     "publish:assets-mcp": "pnpm --filter @miriad-systems/assets-mcp build && pnpm --filter @miriad-systems/assets-mcp publish --access public",
-    "build:miriad-cloud": "docker build -t miriad-cloud -f ../agents/miriad-cloud/Dockerfile .."
+    "build:miriad-cloud": "docker build -t miriad-cloud -f ../agents/miriad-cloud/Dockerfile ..",
+    "test:cloudflare": "pnpm --filter @miriad/cloudflare test:security"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -25,5 +26,6 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "packageManager": "pnpm@9.15.9"
 }

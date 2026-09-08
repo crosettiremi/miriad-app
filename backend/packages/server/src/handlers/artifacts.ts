@@ -1102,6 +1102,7 @@ export function createArtifactRoutes(options: ArtifactHandlerOptions): Hono {
         let counter = 2;
         while (await storage.getArtifact(channel.id, `${baseName}-${counter}${ext}`)) {
           counter++;
+          if (counter > 100) return c.json({error:'Too many files with this name; choose another filename'},409);
         }
         finalSlug = `${baseName}-${counter}${ext}`;
       }

@@ -16,6 +16,30 @@
     "./runtimes/runtime-protocol-handlers": {
       "import": "./dist/runtimes/runtime-protocol-handlers.js",
       "types": "./dist/runtimes/runtime-protocol-handlers.d.ts"
+    },
+    "./app-core": {
+      "types": "./dist/app-core.d.ts",
+      "import": "./dist/app-core.js"
+    },
+    "./auth/session": {
+      "types": "./dist/auth/session.d.ts",
+      "import": "./dist/auth/session.js"
+    },
+    "./handlers/runtime-auth": {
+      "types": "./dist/handlers/runtime-auth.d.ts",
+      "import": "./dist/handlers/runtime-auth.js"
+    },
+    "./assets/index": {
+      "types": "./dist/assets/index.d.ts",
+      "import": "./dist/assets/index.js"
+    },
+    "./auth/container-token": {
+      "types": "./dist/auth/container-token.d.ts",
+      "import": "./dist/auth/container-token.js"
+    },
+    "./onboarding/seed": {
+      "types": "./dist/onboarding/seed.d.ts",
+      "import": "./dist/onboarding/seed.js"
     }
   },
   "scripts": {

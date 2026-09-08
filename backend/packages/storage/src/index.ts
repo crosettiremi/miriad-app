@@ -12,4 +12,6 @@ export type { StoredConnection } from '@cast/core';
 
 // Implementations
 export { createPostgresStorage } from './postgres.js';
-export type { PostgresStorageOptions } from './postgres.js';
+export type { PostgresStorageOptions, TypedSql } from './postgres.js';
+
+export { migrateSchema } from './schema.js';

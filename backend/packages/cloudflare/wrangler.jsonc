@@ -1,0 +1,67 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "miriad-staging",
+  "main": "src/index.ts",
+  "account_id": "f14987cb2f1db42ebfde241a23700328",
+  "compatibility_date": "2026-09-08",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "directory": "../../../frontend/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SPACES",
+        "class_name": "SpaceAgent"
+      },
+      {
+        "name": "SANDBOX",
+        "class_name": "Sandbox"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "SpaceAgent",
+        "Sandbox"
+      ]
+    }
+  ],
+  "containers": [
+    {
+      "class_name": "Sandbox",
+      "image": "../../../agents/cloudflare/Dockerfile",
+      "image_build_context": "../../..",
+      "instance_type": "standard-1",
+      "max_instances": 2
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ASSET_BUCKET",
+      "bucket_name": "miriad-staging-assets"
+    },
+    {
+      "binding": "BACKUP_BUCKET",
+      "bucket_name": "miriad-staging-checkpoints"
+    }
+  ],
+  "vars": {
+    "NODE_ENV": "production",
+    "AUTH_MODE": "workos",
+    "CONTENT_SOURCE": "bundled",
+    "CLOUDFLARE_ACCOUNT_ID": "f14987cb2f1db42ebfde241a23700328",
+    "BACKUP_BUCKET_NAME": "miriad-staging-checkpoints"
+  }
+}

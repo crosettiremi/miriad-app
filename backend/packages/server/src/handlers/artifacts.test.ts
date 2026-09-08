@@ -167,7 +167,7 @@ function createMockStorage(): Storage {
 
     // Artifact operations
     createArtifact: vi.fn(async () => mockArtifact),
-    getArtifact: vi.fn(async () => mockArtifact),
+    getArtifact: vi.fn(async (_channelId: string, slug: string) => slug === mockArtifact.slug ? mockArtifact : null),
     updateArtifactWithCAS: vi.fn(async (): Promise<ArtifactCASResult> => ({
       success: true,
       artifact: mockArtifact,
@@ -461,7 +461,7 @@ describe('Artifact Routes', () => {
     });
 
     it('returns 409 when artifact already exists without replace flag', async () => {
-      // getArtifact returns an existing artifact
+      vi.mocked(mockStorage.getArtifact).mockResolvedValueOnce(createMockArtifact({slug:'new-artifact'}));
       const res = await app.request(`/channels/${TEST_CHANNEL_ID}/artifacts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -474,6 +474,7 @@ describe('Artifact Routes', () => {
     });
 
     it('replaces artifact when replace flag is true', async () => {
+      vi.mocked(mockStorage.getArtifact).mockResolvedValueOnce(createMockArtifact({slug:'new-artifact'}));
       const res = await app.request(`/channels/${TEST_CHANNEL_ID}/artifacts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -978,7 +979,7 @@ describe('Artifact Routes', () => {
       expect(json.error).toContain('Missing file data');
     });
 
-    it('returns 400 for invalid slug format', async () => {
+    it('normalizes uploaded filenames', async () => {
       const res = await app.request(`/channels/${TEST_CHANNEL_ID}/assets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -990,7 +991,8 @@ describe('Artifact Routes', () => {
         }),
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(201);
+      expect(mockAssetStorage.saveAsset).toHaveBeenCalledWith(expect.objectContaining({slug:'invalid-slug'}));
     });
 
     it('returns 413 when file exceeds size limit', async () => {

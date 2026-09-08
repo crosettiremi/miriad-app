@@ -30,20 +30,10 @@ import { generateContainerToken, parseSession } from '../auth/index.js';
 // Stable dev secret - used when no environment variable is set
 const DEV_SECRET = 'cast-dev-server-secret-do-not-use-in-production';
 
-// Get secret from environment
-const ENV_SECRET = process.env.CAST_SERVER_SECRET;
-
-// Fail hard in production if secret not configured
-if (process.env.NODE_ENV === 'production' && !ENV_SECRET) {
-  throw new Error('CAST_SERVER_SECRET is required in production');
-}
-
-// Use environment variable or fall back to dev secret (non-production only)
-const SERVER_SECRET = ENV_SECRET ?? DEV_SECRET;
-
-// Log once at startup (dev mode only)
-if (!ENV_SECRET) {
-  console.log('[RuntimeAuth] Using dev secret (set CAST_SERVER_SECRET in production)');
+function getServerSecret(): string {
+  const secret = process.env.CAST_SERVER_SECRET;
+  if (!secret && process.env.NODE_ENV === 'production') throw new Error('CAST_SERVER_SECRET is required in production');
+  return secret ?? DEV_SECRET;
 }
 
 // Bootstrap token expiry (10 minutes)
@@ -94,7 +84,7 @@ function generateServerId(): string {
 function generateServerSecret(serverId: string, spaceId: string): string {
   // HMAC-signed server secret
   const data = `${serverId}:${spaceId}`;
-  const hmac = createHmac('sha256', SERVER_SECRET).update(data).digest('base64url');
+  const hmac = createHmac('sha256', getServerSecret()).update(data).digest('base64url');
   return `sk_cast_${hmac}`;
 }
 

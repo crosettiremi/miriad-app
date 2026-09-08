@@ -1,3 +1,5 @@
+import { agentTemplates as bundledAgents } from './content/agents.js';
+import { playbooks as bundledPlaybooks } from './content/playbooks.js';
 /**
  * Sanity Client
  *
@@ -142,6 +144,10 @@ async function query<T>(groq: string): Promise<T> {
  * This fetches agent templates, MCP servers, and playbooks in parallel.
  */
 export async function fetchOnboardingContent(): Promise<OnboardingContent> {
+  if (process.env.CONTENT_SOURCE === 'bundled') return {
+    agentTemplates:bundledAgents, mcpServers: [],
+    playbooks: bundledPlaybooks.map(p => ({...p, _id:p.slug, _type:'playbook', slug:{current:p.slug}, bootstrapped:true})),
+  };
   const [agentTemplates, mcpServers, playbooks] = await Promise.all([
     query<SanityAgentTemplate[]>(AGENT_TEMPLATES_QUERY),
     query<SanityMcpServer[]>(MCP_SERVERS_QUERY),
