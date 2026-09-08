@@ -1,4 +1,16 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+const team = process.env.MIRIAD_ACCESS_TEAM_DOMAIN;
+const audience = process.env.MIRIAD_ACCESS_AUD;
+const runtime = process.env.MIRIAD_RUNTIME_ORIGIN;
+if (
+  !team ||
+  !/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(team) ||
+  !audience ||
+  !/^[a-f0-9]{64}$/.test(audience)
+)
+  throw new Error('Real Access team hostname and application AUD are required');
+if (!runtime) throw new Error('MIRIAD_RUNTIME_ORIGIN is required');
+const runtimeUrl = new URL(runtime);
 const id = process.env.MIRIAD_HYPERDRIVE_ID;
 const app = process.env.MIRIAD_APP_ORIGIN;
 const preview = process.env.MIRIAD_PREVIEW_DOMAIN;
@@ -27,6 +39,14 @@ if (
   url.hostname.endsWith('.' + preview)
 )
   throw new Error('Use a separate preview hostname');
+if (
+  runtimeUrl.protocol !== 'https:' ||
+  runtimeUrl.origin !== runtime ||
+  runtime === app ||
+  runtimeUrl.hostname === preview ||
+  runtimeUrl.hostname.endsWith('.' + preview)
+)
+  throw new Error('Use a separate HTTPS runtime origin');
 const config = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'));
 config.hyperdrive = [{ binding: 'HYPERDRIVE', id }];
 config.vars = {
@@ -35,10 +55,13 @@ config.vars = {
   APP_URL: app,
   FRONTEND_URL: app,
   CAST_API_URL: app,
-  WORKOS_REDIRECT_URI: app + '/auth/callback',
+  ACCESS_TEAM_DOMAIN: team,
+  ACCESS_AUD: audience,
+  RUNTIME_ORIGIN: runtime,
   PREVIEW_DOMAIN: preview,
 };
 config.routes = [
+  { pattern: runtimeUrl.hostname, custom_domain: true },
   { pattern: `*.${preview}/*`, zone_id: zone },
   ...(!url.hostname.endsWith('.workers.dev')
     ? [{ pattern: url.hostname, custom_domain: true }]

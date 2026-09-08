@@ -69,6 +69,8 @@ import { resetRootChannel } from "./onboarding/index.js";
 // =============================================================================
 
 export interface AppOptions {
+  /** Machine origin for built-in MCP; browser OAuth keeps the public API origin. */
+  platformMcpUrl?: string;
   /** Storage backend for messages, channels, roster */
   storage: Storage;
   /** Platform-provided binary asset adapter. */
@@ -1209,7 +1211,7 @@ export function createApp(options: AppOptions): Hono {
   // WorkOS auth routes (production)
   // These are always mounted - they'll return errors if WorkOS env vars aren't set
   const workosAuthRoutes = createWorkOSAuthRoutes({ storage });
-  app.route("/auth", workosAuthRoutes);
+  if (process.env.AUTH_MODE === "workos") app.route("/auth", workosAuthRoutes);
 
   // GET /auth/me is shared between dev and workos modes
   // (dev routes have /me handler, workos routes can add their own later)
@@ -1501,7 +1503,7 @@ export function createApp(options: AppOptions): Hono {
       };
     },
     // Platform MCP URL for built-in powpow tools
-    platformMcpUrl: apiUrl,
+    platformMcpUrl: options.platformMcpUrl ?? apiUrl,
     // Environment resolution: get system.environment artifacts for a channel
     getEnvironmentArtifacts: async (sid, cid) => {
       // First list to get slugs, then fetch full artifacts to get secrets

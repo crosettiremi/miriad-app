@@ -38,6 +38,7 @@ jobs:
       - run: pnpm --dir backend build
       - run: pnpm --dir frontend build
       - run: pnpm --dir backend test
+      - run: pnpm --dir backend/packages/cloudflare exec node --test scripts/homelab-migration.test.mjs
       - run: pnpm --dir backend/packages/cloudflare test:security
       - run: pnpm --dir backend/packages/cloudflare test:postgres
         env:

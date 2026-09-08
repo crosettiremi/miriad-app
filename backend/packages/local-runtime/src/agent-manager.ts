@@ -245,10 +245,12 @@ export class AgentManager {
     const { agentId, systemPrompt, mcpServers, workspacePath, props } = message;
     const { callsign } = parseAgentId(agentId);
     // Extract engine from props, default to claude-sdk
-    const engineId = (props?.engine === 'nuum' ? 'nuum' : 'claude-sdk') as 'claude-sdk' | 'nuum';
+    const engineId = process.env.MIRIAD_ENGINE === 'workers-ai'
+      ? 'workers-ai'
+      : (props?.engine === 'workers-ai' ? 'workers-ai' : props?.engine === 'nuum' ? 'nuum' : 'claude-sdk');
 
     console.log(`[AgentManager] Activating ${agentId} with engine: ${engineId}`);
-    console.log(`[AgentManager]   mcpServers from message:`, JSON.stringify(mcpServers));
+    console.log(`[AgentManager]   mcpServers from message:`, mcpServers ? Object.keys(mcpServers).length : 0);
 
     // Check if already active
     const existing = this.agents.get(agentId);
@@ -294,13 +296,13 @@ export class AgentManager {
       engineProcess: null,
     };
 
-    console.log(`[AgentManager]   Stored mcpServers in state:`, JSON.stringify(instance.state.mcpServers));
+    console.log(`[AgentManager]   Stored mcpServers in state:`, instance.state.mcpServers?.length ?? 0);
     this.agents.set(agentId, instance);
 
     // For Nuum engine, spawn the subprocess now
-    if (engineId === 'nuum') {
+    if (engineId !== 'claude-sdk') {
       try {
-        const nuumEngine = this.engineManager.getEngine('nuum');
+        const nuumEngine = this.engineManager.getEngine(engineId);
         if (!nuumEngine) {
           throw new Error('Nuum engine not registered');
         }
@@ -347,6 +349,13 @@ export class AgentManager {
     try {
       for await (const message of instance.engineProcess.output) {
         await instance.bridge.processSDKMessage(message);
+        if (message.type === 'result' && instance.state.status !== 'offline') {
+          const pending = (message as typeof message & { miriad_pending?: boolean }).miriad_pending === true;
+          instance.state.status = pending ? 'busy' : message.is_error ? 'error' : 'online';
+          instance.state.lastActivity = new Date().toISOString();
+          if (message.is_error)
+            this.config.onError?.(instance.state.agentId, new Error('Agent turn failed; inspect its error result'));
+        }
       }
       await instance.bridge.finalize();
       console.log(`[AgentManager] @${callsign} engine output stream ended`);
@@ -413,7 +422,7 @@ export class AgentManager {
     }
 
     // Route based on engine type
-    if (instance.state.engine === 'nuum') {
+    if (instance.state.engine !== 'claude-sdk') {
       await this.deliverMessageToNuum(instance, message);
     } else {
       await this.deliverMessageToClaudeSDK(instance, message);
@@ -441,6 +450,7 @@ export class AgentManager {
       sender: message.sender,
       systemPrompt: message.systemPrompt,
       mcpServers: message.mcpServers,
+      environment: message.environment,
     });
 
     instance.state.status = 'busy';
@@ -610,7 +620,7 @@ export class AgentManager {
     // Add MCP servers if configured (SDK expects Record<string, McpServerConfig>)
     if (state.mcpServers && state.mcpServers.length > 0) {
       console.log(`[AgentManager] Building MCP config from state.mcpServers (count: ${state.mcpServers.length})`);
-      console.log(`[AgentManager]   state.mcpServers:`, JSON.stringify(state.mcpServers));
+      console.log(`[AgentManager]   state.mcpServers:`, state.mcpServers?.length ?? 0);
       // Build MCP servers config - use type assertion since SDK uses discriminated unions
       const mcpServers: Record<string, unknown> = {};
       for (const server of state.mcpServers) {
@@ -643,7 +653,7 @@ export class AgentManager {
         }
       }
       if (Object.keys(mcpServers).length > 0) {
-        console.log(`[AgentManager]   Built SDK mcpServers:`, JSON.stringify(mcpServers));
+        console.log(`[AgentManager]   Built SDK mcpServers:`, mcpServers ? Object.keys(mcpServers).length : 0);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         options.mcpServers = mcpServers as any;
       }

@@ -186,6 +186,8 @@ export interface ToolResultValue extends TymbalValueBase {
 export interface ErrorValue extends TymbalValueBase {
   type: 'error';
   content: string;
+  /** Another agent turn is queued; this error does not indicate idle. */
+  pending?: boolean;
 }
 
 export interface IdleValue extends TymbalValueBase {
@@ -273,7 +275,7 @@ export interface AgentState {
   /** Per-request environment variables and secrets */
   environment?: Record<string, string>;
   /** Engine used for this agent */
-  engine: 'claude-sdk' | 'nuum';
+  engine: 'claude-sdk' | 'nuum' | 'workers-ai';
   activatedAt: string;
   lastActivity: string;
 }

@@ -12,6 +12,8 @@ export { NuumEngine } from './nuum-engine.js';
 import { EngineManager } from './engine-manager.js';
 import { ClaudeSDKEngine } from './claude-sdk-engine.js';
 import { NuumEngine } from './nuum-engine.js';
+import { WorkersAIEngine } from './workers-ai-engine.js';
+export { WorkersAIEngine } from './workers-ai-engine.js';
 
 /**
  * Create and configure the default engine manager with all available engines.
@@ -22,6 +24,7 @@ export function createEngineManager(): EngineManager {
   // Register default engines
   manager.register(new ClaudeSDKEngine());
   manager.register(new NuumEngine());
+  manager.register(new WorkersAIEngine());
 
   return manager;
 }

@@ -54,7 +54,7 @@ interface RuntimeStatusDropdownProps {
 
 // Temporary hack: identify Miriad Cloud by name
 function isMiriadCloud(runtime: Runtime): boolean {
-  return runtime.name === 'Miriad Cloud'
+  return runtime.name === 'Miriad Cloud' || runtime.name === 'miriad-cloud'
 }
 
 // Check if runtime is stale (no heartbeat in STALE_TIMEOUT_MS)
@@ -75,7 +75,7 @@ export function RuntimeStatusDropdown({ apiHost, spaceId, onOpenSettings, settin
   const [startingCloud, setStartingCloud] = useState(false)
   const [stoppingCloud, setStoppingCloud] = useState(false)
   const [deletingRuntime, setDeletingRuntime] = useState<string | null>(null)
-  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
+  const [modelReady, setModelReady] = useState<boolean | null>(null)
   const [hasCheckedRuntimes, setHasCheckedRuntimes] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   // Track previous runtime statuses to detect changes
@@ -91,13 +91,15 @@ export function RuntimeStatusDropdown({ apiHost, spaceId, onOpenSettings, settin
   useEffect(() => {
     async function checkApiKey() {
       try {
+        const status = await apiJson<{ requiresApiKey?: boolean }>(`${apiHost}/api/runtimes/miriad-cloud/status`).catch(() => null)
+        if (status?.requiresApiKey === false) { setModelReady(true); return }
         const data = await apiJson<SecretsListResponse>(
           `${apiHost}/api/spaces/${spaceId}/secrets`
         )
-        setHasApiKey(ANTHROPIC_API_KEY in data.secrets)
+        setModelReady(ANTHROPIC_API_KEY in data.secrets)
       } catch (err) {
         console.error('Failed to check API key:', err)
-        setHasApiKey(false)
+        setModelReady(false)
       }
     }
     // Check when dropdown is open and settings modal is not covering it
@@ -156,11 +158,11 @@ export function RuntimeStatusDropdown({ apiHost, spaceId, onOpenSettings, settin
 
   // Notify parent of disconnected state (no runtime online AND no API key)
   useEffect(() => {
-    if (onDisconnectedStateChange && hasCheckedRuntimes && hasApiKey !== null) {
-      const isDisconnected = !hasAnyOnline && !hasApiKey
+    if (onDisconnectedStateChange && hasCheckedRuntimes && modelReady !== null) {
+      const isDisconnected = !hasAnyOnline && !modelReady
       onDisconnectedStateChange(isDisconnected)
     }
-  }, [hasCheckedRuntimes, hasAnyOnline, hasApiKey, onDisconnectedStateChange])
+  }, [hasCheckedRuntimes, hasAnyOnline, modelReady, onDisconnectedStateChange])
 
   async function fetchRuntimes() {
     setLoading(true)
@@ -350,11 +352,11 @@ export function RuntimeStatusDropdown({ apiHost, spaceId, onOpenSettings, settin
                     <div>
                       <div className="text-base font-medium">Miriad Cloud</div>
                       <div className="text-xs text-muted-foreground">
-                        {hasApiKey === false ? 'Not configured' : startingCloud ? 'Starting...' : 'Not running'}
+                        {modelReady === false ? 'Not configured' : startingCloud ? 'Starting...' : 'Not running'}
                       </div>
                     </div>
                   </div>
-                  {hasApiKey === false ? (
+                  {modelReady === false ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -460,7 +462,7 @@ export function RuntimeStatusDropdown({ apiHost, spaceId, onOpenSettings, settin
                         )}
                         {/* Start/Configure button for offline Miriad Cloud */}
                         {isCloud && runtime.status === 'offline' && (
-                          hasApiKey === false ? (
+                          modelReady === false ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()

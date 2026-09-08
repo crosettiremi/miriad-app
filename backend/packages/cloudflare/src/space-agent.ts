@@ -1,4 +1,5 @@
 import { verifyCheckpoint, deleteCheckpoint } from './checkpoint.js';
+import { inferenceInput, MAX_INFERENCE_BYTES, runWorkersAI, type InferenceInput } from './workers-ai.js';
 import { getSandbox, type DirectoryBackup } from '@cloudflare/sandbox';
 import {
   Agent,
@@ -21,6 +22,36 @@ import { authorizeChannel, type Principal } from './auth.js';
 type SocketState = Principal & { channelId?: string; runtimeId?: string };
 /** Private operational state only. No @callable methods: browser RPC is forbidden. */
 export class SpaceAgent extends Agent<Env> {
+  private activeModelRequests = 0;
+
+  // Internal binding RPC only: intentionally not @callable on browser sockets.
+  async inferModel(principal: Principal, raw: InferenceInput) {
+    if (principal.role !== 'runtime' || principal.spaceId !== this.name ||
+        principal.expiresAt <= Date.now())
+      return { status: 403, body: { error: 'Runtime access denied' } };
+    const input = inferenceInput.parse(raw);
+    if (new TextEncoder().encode(JSON.stringify(input)).length > MAX_INFERENCE_BYTES)
+      return { status: 400, body: { error: 'Model input too large' } };
+    if (this.activeModelRequests >= 4)
+      return { status: 429, body: { error: 'Model concurrency limit reached' } };
+    this.activeModelRequests++;
+    try {
+      const allowed = await this.ctx.storage.transaction(async (tx) => {
+        const minute = Math.floor(Date.now() / 60000);
+        const previous = await tx.get<{ minute: number; count: number }>('aiRate');
+        const count = previous?.minute === minute ? previous.count : 0;
+        if (count >= 60) return false;
+        await tx.put('aiRate', { minute, count: count + 1 });
+        return true;
+      });
+      if (!allowed) return { status: 429, body: { error: 'Model request rate limit reached' } };
+      return { status: 200, body: await runWorkersAI(this.env, input) };
+    } catch (error) {
+      console.error('Workers AI inference failed', error instanceof Error ? error.name : 'Error');
+      return { status: 502, body: { error: 'Workers AI inference failed; retry the turn' } };
+    } finally { this.activeModelRequests--; }
+  }
+
   async fetch(request: Request): Promise<Response> {
     try {
       const principal: Principal = JSON.parse(
@@ -262,7 +293,8 @@ export class SpaceAgent extends Agent<Env> {
             'v' in event.frame &&
             event.frame.v &&
             typeof event.frame.v === 'object' &&
-            ['idle', 'error'].includes(String(event.frame.v.type))
+            ['idle', 'error'].includes(String(event.frame.v.type)) &&
+            !(event.frame.v.type === 'error' && event.frame.v.pending === true)
           ) {
             const active =
               (await this.ctx.storage.get<string[]>('activeAgents')) ?? [];
@@ -355,6 +387,9 @@ export class SpaceAgent extends Agent<Env> {
     );
     return {
       available: true,
+      modelProvider: this.env.HOSTED_ENGINE === 'workers-ai' ? 'workers-ai' : 'anthropic',
+      model: this.env.HOSTED_ENGINE === 'workers-ai' ? this.env.WORKERS_AI_MODEL : null,
+      requiresApiKey: this.env.HOSTED_ENGINE !== 'workers-ai',
       runtime,
       container: { status: phase, provider: 'cloudflare' },
     };
@@ -365,6 +400,7 @@ export class SpaceAgent extends Agent<Env> {
         if ((await storage.getSpace(this.name))?.ownerId !== userId)
           throw new Error('Space access denied');
         if (
+          this.env.HOSTED_ENGINE !== 'workers-ai' &&
           !(await storage.getSpaceSecretValue(
             this.name,
             'anthropic_api_key',
@@ -416,7 +452,7 @@ export class SpaceAgent extends Agent<Env> {
               this.name,
               'anthropic_api_key',
             )) ?? this.env.ANTHROPIC_API_KEY;
-          if (!anthropicKey)
+          if (this.env.HOSTED_ENGINE !== 'workers-ai' && !anthropicKey)
             throw new Error('Configure the Claude API key in Settings');
           let serverId = await this.ctx.storage.get<string>('hostedServerId');
           let server = serverId
@@ -445,8 +481,8 @@ export class SpaceAgent extends Agent<Env> {
               status: 'offline',
               config: { wsConnectionId: null },
             });
-          const origin = this.env.APP_ORIGIN;
-          if (!origin) throw new Error('APP_ORIGIN is required');
+          const origin = this.env.RUNTIME_ORIGIN;
+          if (!origin) throw new Error('RUNTIME_ORIGIN is required');
           const config = {
             spaceId: this.name,
             name: 'miriad-cloud',
@@ -467,7 +503,12 @@ export class SpaceAgent extends Agent<Env> {
               env: {
                 MIRIAD_RELIABLE_FRAMES: '1',
                 MIRIAD_CONFIG: JSON.stringify(config),
-                ANTHROPIC_API_KEY: anthropicKey,
+                ...(this.env.HOSTED_ENGINE === 'workers-ai' ? {
+                  MIRIAD_ENGINE: 'workers-ai',
+                  MIRIAD_AI_URL: `${origin}/api/ai/chat/completions`,
+                  MIRIAD_AI_TOKEN: server.secret,
+                  MIRIAD_AI_MODEL: this.env.WORKERS_AI_MODEL,
+                } : { ANTHROPIC_API_KEY: anthropicKey! }),
                 CLAUDE_CONFIG_DIR: '/workspace/.claude',
                 HOME: '/home/agent',
               },

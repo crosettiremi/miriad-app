@@ -12,6 +12,7 @@ export async function authenticate(
   request: Request,
   storage: Storage,
   secret: string,
+  browserMode: 'workos' | 'access' = 'workos',
 ): Promise<Principal | null> {
   const authorization = request.headers.get('Authorization');
   if (authorization?.startsWith('Container ')) {
@@ -52,7 +53,7 @@ export async function authenticate(
     if (
       typeof p.userId !== 'string' ||
       typeof p.spaceId !== 'string' ||
-      p.mode !== 'workos' ||
+      p.mode !== browserMode ||
       typeof p.exp !== 'number' ||
       p.exp * 1000 <= Date.now()
     )

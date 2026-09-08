@@ -13,7 +13,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 // Types
 // =============================================================================
 
-export type AuthMode = 'dev' | 'workos';
+export type AuthMode = 'dev' | 'workos' | 'access';
 
 export interface SessionPayload {
   /** User ID */

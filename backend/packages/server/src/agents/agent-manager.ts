@@ -856,7 +856,7 @@ export class AgentManager {
       };
       console.log(
         `[AgentManager] Adding miriad MCP:`,
-        JSON.stringify(miriadMcp),
+        miriadMcp.name,
       );
       configs.push(miriadMcp);
 

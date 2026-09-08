@@ -230,6 +230,8 @@ export interface StatusValue extends SetFrameValueBase {
 export interface ErrorValue extends SetFrameValueBase {
   type: 'error';
   content: string;
+  /** Another agent turn is queued; this error does not indicate idle. */
+  pending?: boolean;
 }
 
 /**
