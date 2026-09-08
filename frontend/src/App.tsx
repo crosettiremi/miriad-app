@@ -45,7 +45,7 @@ import { RuntimeStatusDropdown } from "./components/RuntimeStatusDropdown";
 import miriadLogo from "./assets/miriad-logo.svg";
 
 // Auth mode: 'dev' (show LoginPage) or 'workos' (redirect to /auth/login)
-const AUTH_MODE = import.meta.env.VITE_AUTH_MODE || "dev";
+const AUTH_MODE = import.meta.env.VITE_AUTH_MODE || (import.meta.env.PROD ? "access" : "dev");
 import type { Agent, Channel, Message } from "./types";
 import type { RosterAgent } from "./components/channel/MentionAutocomplete";
 
@@ -183,7 +183,7 @@ export function App() {
     checkAuth().then((session) => {
       if (session) {
         setAuthSession(session);
-      } else if (AUTH_MODE === "workos") {
+      } else if ((AUTH_MODE === "workos" || AUTH_MODE === "access")) {
         // In prod mode, redirect to backend login endpoint
         window.location.href = `${API_HOST}/auth/login`;
       } else {
@@ -1127,7 +1127,7 @@ export function App() {
   if (authError) {
     const handleRetryAuth = () => {
       setAuthError(null);
-      if (AUTH_MODE === "workos") {
+      if ((AUTH_MODE === "workos" || AUTH_MODE === "access")) {
         window.location.href = `${API_HOST}/auth/login`;
       }
     };

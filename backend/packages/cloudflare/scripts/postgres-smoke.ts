@@ -1,3 +1,4 @@
+import { provisionAccessUser, externalAccessId } from '../src/access.js';
 import assert from 'node:assert/strict';
 import { migrateSchema } from '@cast/storage';
 import { seedSpaceFromSanity } from '@cast/server/onboarding/seed';
@@ -91,8 +92,52 @@ try {
     0,
   );
   assert.equal((await db.storage.getMessages(space.id, channel.id)).length, 1);
+  const accessIdentity = {
+    subject: crypto.randomUUID(),
+    email: 'owner@example.com',
+    issuer: 'https://test.cloudflareaccess.com',
+    expiresAt: Date.now() + 60000,
+  };
+  const second = openStorage(process.env.DATABASE_URL!);
+  const profiles: string[] = [];
+  try {
+    await Promise.all(
+      [db, second].map((client) =>
+        client.transaction(async (storage, sql) => {
+          const key = externalAccessId(accessIdentity);
+          await sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+          const profile = await provisionAccessUser(storage, accessIdentity);
+          profiles.push(profile.user.id + ':' + profile.space.id);
+        }),
+      ),
+    );
+    assert.equal(profiles.length, 2);
+    assert.equal(
+      profiles[0],
+      profiles[1],
+      'Concurrent first login must create exactly one user/space',
+    );
+    const original = await db.storage.getUserByExternalId(
+      externalAccessId(accessIdentity),
+    );
+    assert.ok(original);
+    assert.equal((await db.storage.getSpacesByOwner(original.id)).length, 1);
+    await db.transaction(async (storage) => {
+      const unrelated = await provisionAccessUser(storage, {
+        ...accessIdentity,
+        subject: crypto.randomUUID(),
+      });
+      assert.notEqual(
+        unrelated.user.id,
+        original.id,
+        'Email alone must never link an identity',
+      );
+    });
+  } finally {
+    await second.close();
+  }
   console.log(
-    'PASS: PostgreSQL schema replay, bundled seed replay, messages, tenant isolation, artifacts, transaction rollback',
+    'PASS: PostgreSQL schema replay, bundled seed replay, messages, tenant isolation, artifacts, transaction rollback, concurrent Access provisioning',
   );
 } finally {
   await db.close();

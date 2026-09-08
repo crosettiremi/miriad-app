@@ -33,12 +33,21 @@ Target account: Rémi Org (`f14987cb2f1db42ebfde241a23700328`). Created buckets:
 
 Configure an isolated PostgreSQL database and a Hyperdrive connection with **query caching disabled**. The `HYPERDRIVE` binding is generated once its real ID is available; no fake ID is checked in. `DATABASE_URL` is an optional direct local-development connection, not the production pooling configuration.
 
-Configure a user-owned WorkOS app with the callback `<app-origin>/auth/callback`. Choose an HTTPS app origin and a separate wildcard preview hostname/zone. Preview grants use one random subdomain per grant, a one-hour signed ticket and a host-only HttpOnly cookie. They are revocable and disabled when the runtime is stopped. App cookies and authorization headers never reach preview processes; upstream `Set-Cookie` is removed. Public quick tunnels are not used.
+Create a self-hosted Cloudflare Access application for `os.prescottandremi.com` in Rémi Org. Allow only the approved owner email, with an eight-hour session. Use the account's identity provider or email one-time PIN. Record the team hostname and application AUD. The Worker verifies the RS256 signature, issuer, AUD, expiry and user claims on every browser request, including static assets and WebSocket upgrades. It never trusts the email header alone or an old app cookie.
+
+First authenticated API use atomically creates an Access-specific Miriad identity, space and bundled content. A PostgreSQL advisory lock prevents concurrent first requests from creating duplicate spaces. Existing WorkOS users are not linked by email. The Worker supplies an internal session to existing handlers, bounded by Access token expiry. Logout uses `/cdn-cgi/access/logout`. Access policy revocation is subject to token/session lifetime; existing WebSockets stop accepting messages/broadcasts at token expiry.
+
+Use `runtime.os.prescottandremi.com` for hosted machine traffic. This origin has no browser Access application; the Worker rejects browser cookies and public auth endpoints there and requires verified Miriad Server/Container credentials. The app origin requires an Access identity even if a machine authorization header is supplied. Workers.dev and version preview URLs are disabled and unknown origins rejected. Existing CLI bootstrap through the protected app requires a browser Access session; unattended runtimes need pre-provisioned Miriad credentials and the runtime origin.
+
+Use `previews.os.prescottandremi.com` as the separate wildcard preview hostname, with a Cloudflare route in the `prescottandremi.com` zone. Preview grants retain their own expiring tickets and host-only cookies. No broad Access bypass policy is created. Runtime and preview hostnames are planned routes, not active deployments until configured and deployed.
 
 In the GitHub environment `cloudflare-staging`, set:
 
 | Kind | Name | Value |
 | --- | --- | --- |
+| Variable | `MIRIAD_ACCESS_TEAM_DOMAIN` | Team hostname, e.g. team.cloudflareaccess.com |
+| Variable | `MIRIAD_ACCESS_AUD` | Exact Access application audience |
+| Variable | `MIRIAD_RUNTIME_ORIGIN` | https://runtime.os.prescottandremi.com |
 | Variable | `MIRIAD_HYPERDRIVE_ID` | Real Hyperdrive ID, query caching disabled |
 | Variable | `MIRIAD_APP_ORIGIN` | HTTPS app origin |
 | Variable | `MIRIAD_PREVIEW_DOMAIN` | Separate preview hostname, e.g. previews.example.com |
@@ -47,7 +56,7 @@ In the GitHub environment `cloudflare-staging`, set:
 | Secret | `CLOUDFLARE_API_TOKEN` | Deployment token scoped to Rémi Org |
 | Secret | `MIRIAD_WORKER_SECRETS` | JSON object containing the Worker secrets below |
 
-Worker secrets: `JWT_SECRET`, `SECRET_KEY`, `CAST_SERVER_SECRET`, `CAST_CONTAINER_SECRET`, `WORKOS_API_KEY`, `WORKOS_CLIENT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `PREVIEW_SECRET`. Use independent random values of at least 32 characters for signing/encryption secrets. R2 S3 credentials must be restricted to the checkpoint bucket. The account and bucket name are nonsecret configuration. Model keys can be entered through Miriad Settings; `ANTHROPIC_API_KEY` is an optional Worker fallback.
+Worker secrets: `JWT_SECRET`, `SECRET_KEY`, `CAST_SERVER_SECRET`, `CAST_CONTAINER_SECRET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `PREVIEW_SECRET`. Use independent random values of at least 32 characters for signing/encryption secrets. R2 S3 credentials must be restricted to the checkpoint bucket. The account and bucket name are nonsecret configuration. Model keys can be entered through Miriad Settings; `ANTHROPIC_API_KEY` is an optional Worker fallback.
 
 Run the manual **Cloudflare staging** workflow after configuring these inputs. It builds/tests, generates deployment config, installs secrets, applies additive database migrations and deploys the Worker/container image. Old AWS/Fly/Vercel/npm publishing workflows are archived under `docs/legacy-deployment`; they no longer trigger in this fork.
 
@@ -69,6 +78,6 @@ Binary uploads through the existing JSON API are limited to 8 MiB on Workers (12
 
 ## Release gate and rollback
 
-Before production, record the Worker version and image digest, then demonstrate: WorkOS login; two authenticated clients and reconnect; a real file-editing agent turn; authenticated preview and revocation; concurrent start/stop; cancellation; checkpoint failure; and a real Sandbox restart restoring Git state, untracked files, symlinks, modes and Claude session files. Repeat against the previous application build and expanded schema.
+Before production, record the Worker version and image digest, then demonstrate: Cloudflare Access login; two authenticated clients and reconnect; a real file-editing agent turn; authenticated preview and revocation; concurrent start/stop; cancellation; checkpoint failure; and a real Sandbox restart restoring Git state, untracked files, symlinks, modes and Claude session files. Repeat against the previous application build and expanded schema.
 
 Database migrations are additive. They do not automatically delete duplicate cost records or run down-migrations. Existing incompatible data must be reconciled explicitly. To roll back a Worker, use `wrangler rollback <previous-version-id> --config wrangler.staging.generated.json`; restore the previous container image separately and retain PostgreSQL data and both valid checkpoints. Rehearse this in staging first.

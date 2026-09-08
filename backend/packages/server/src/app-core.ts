@@ -1209,7 +1209,7 @@ export function createApp(options: AppOptions): Hono {
   // WorkOS auth routes (production)
   // These are always mounted - they'll return errors if WorkOS env vars aren't set
   const workosAuthRoutes = createWorkOSAuthRoutes({ storage });
-  app.route("/auth", workosAuthRoutes);
+  if (process.env.AUTH_MODE === "workos") app.route("/auth", workosAuthRoutes);
 
   // GET /auth/me is shared between dev and workos modes
   // (dev routes have /me handler, workos routes can add their own later)

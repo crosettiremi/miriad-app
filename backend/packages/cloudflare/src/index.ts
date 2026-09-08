@@ -1,3 +1,9 @@
+import {
+  verifyAccess,
+  accessSessionRequest,
+  externalAccessId,
+  provisionAccessUser,
+} from './access.js';
 import { isPreviewHost, servePreview, createPreview } from './previews.js';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -26,12 +32,54 @@ export default {
             : 'configuration_required',
         service: 'miriad-cloudflare',
       });
+    const runtimeHost =
+      !!env.RUNTIME_ORIGIN && url.origin === env.RUNTIME_ORIGIN;
+    if (!runtimeHost && url.origin !== env.APP_ORIGIN)
+      return new Response('Unknown application origin', { status: 404 });
+    if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD)
+      return new Response('Cloudflare Access configuration required', {
+        status: 503,
+      });
+    const identity = runtimeHost ? null : await verifyAccess(request, env);
+    if (!runtimeHost && !identity)
+      return new Response('Cloudflare Access authentication required', {
+        status: 401,
+      });
+    if (runtimeHost) {
+      // No browser sessions or public auth endpoints on the machine-only origin.
+      const auth = request.headers.get('Authorization') ?? '';
+      if (
+        !/^(Server|Container) .+/.test(auth) ||
+        url.pathname.startsWith('/auth/') ||
+        url.pathname === '/api/runtimes/auth/bootstrap'
+      )
+        return new Response('Machine credentials required', { status: 401 });
+      const headers = new Headers(request.headers);
+      headers.delete('Cookie');
+      request = new Request(request, { headers });
+    }
     if (!websocket && !apiPath.test(url.pathname))
-      return env.ASSETS.fetch(request);
+      return runtimeHost
+        ? new Response('Not found', { status: 404 })
+        : env.ASSETS.fetch(request);
+    if (identity && url.pathname === '/auth/logout') {
+      const logoutUrl = `${env.APP_ORIGIN}/cdn-cgi/access/logout`;
+      const headers = {
+        'Set-Cookie':
+          'cast_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax',
+        'Cache-Control': 'no-store',
+      };
+      return request.method === 'POST'
+        ? Response.json({ ok: true, logoutUrl }, { headers })
+        : new Response(null, {
+            status: 302,
+            headers: { ...headers, Location: logoutUrl },
+          });
+    }
     const databaseUrl = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
-    if (!databaseUrl || !env.JWT_SECRET || !env.APP_ORIGIN)
+    if (!databaseUrl || !env.JWT_SECRET)
       return Response.json(
-        { error: 'Staging database and authentication configuration required' },
+        { error: 'Staging database configuration required' },
         { status: 503 },
       );
     const origin = request.headers.get('Origin');
@@ -48,7 +96,37 @@ export default {
       return new Response('Origin required', { status: 403 });
     const db = openStorage(databaseUrl);
     try {
-      const principal = await authenticate(request, db.storage, env.JWT_SECRET);
+      if (identity) {
+        let userId = '',
+          spaceId = '';
+        await db.transaction(async (storage, sql) => {
+          const key = externalAccessId(identity);
+          await sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+          const profile = await provisionAccessUser(storage, identity);
+          userId = profile.user.id;
+          spaceId = profile.space.id;
+        });
+        request = await accessSessionRequest(
+          request,
+          userId,
+          spaceId,
+          identity,
+          env.JWT_SECRET,
+        );
+        if (url.pathname === '/auth/login')
+          return new Response(null, {
+            status: 302,
+            headers: { Location: env.APP_ORIGIN!, 'Cache-Control': 'no-store' },
+          });
+      }
+      const principal = await authenticate(
+        request,
+        db.storage,
+        env.JWT_SECRET,
+        'access',
+      );
+      if (runtimeHost && (!principal || principal.role === 'browser'))
+        return new Response('Unauthorized', { status: 401 });
       if (websocket) {
         if (!principal || principal.role === 'container')
           return new Response('Unauthorized', { status: 401 });
@@ -100,7 +178,7 @@ export default {
         ).revokePreview(url.pathname.split('/').pop()!);
         return new Response(null, { status: 204 });
       }
-      const publicAuth = url.pathname.startsWith('/auth/') || bootstrap;
+      const publicAuth = false; // Access verification precedes every browser API request.
       if (!principal && !publicAuth)
         return new Response('Unauthorized', { status: 401 });
       // Container routes perform their own signed token authorization in the shared API.

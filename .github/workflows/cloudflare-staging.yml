@@ -31,6 +31,9 @@ jobs:
       - name: Validate staging configuration
         run: pnpm --dir backend/packages/cloudflare exec tsx scripts/check-deployment.ts
         env:
+          MIRIAD_ACCESS_TEAM_DOMAIN: ${{ vars.MIRIAD_ACCESS_TEAM_DOMAIN }}
+          MIRIAD_ACCESS_AUD: ${{ vars.MIRIAD_ACCESS_AUD }}
+          MIRIAD_RUNTIME_ORIGIN: ${{ vars.MIRIAD_RUNTIME_ORIGIN }}
           MIRIAD_HYPERDRIVE_ID: ${{ vars.MIRIAD_HYPERDRIVE_ID }}
           MIRIAD_APP_ORIGIN: ${{ vars.MIRIAD_APP_ORIGIN }}
           MIRIAD_PREVIEW_DOMAIN: ${{ vars.MIRIAD_PREVIEW_DOMAIN }}

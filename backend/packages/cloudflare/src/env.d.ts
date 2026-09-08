@@ -6,9 +6,9 @@ interface Env extends Cloudflare.Env {
   DATABASE_URL?: string;
   APP_ORIGIN?: string;
   JWT_SECRET?: string;
-  WORKOS_API_KEY?: string;
-  WORKOS_CLIENT_ID?: string;
-  WORKOS_REDIRECT_URI?: string;
+  ACCESS_TEAM_DOMAIN?: string;
+  ACCESS_AUD?: string;
+  RUNTIME_ORIGIN?: string;
   CAST_SERVER_SECRET?: string;
   CAST_CONTAINER_SECRET?: string;
   SECRET_KEY?: string;

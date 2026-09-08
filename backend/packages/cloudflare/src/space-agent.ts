@@ -445,8 +445,8 @@ export class SpaceAgent extends Agent<Env> {
               status: 'offline',
               config: { wsConnectionId: null },
             });
-          const origin = this.env.APP_ORIGIN;
-          if (!origin) throw new Error('APP_ORIGIN is required');
+          const origin = this.env.RUNTIME_ORIGIN;
+          if (!origin) throw new Error('RUNTIME_ORIGIN is required');
           const config = {
             spaceId: this.name,
             name: 'miriad-cloud',
